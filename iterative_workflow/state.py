@@ -5,5 +5,5 @@ class TweetState(TypedDict):
     tweet: str
     evaluation: Literal['approved', 'needs_improvement']
     feedback: str
-    iter: int
-    max_iter: int
+    iteration: int
+    max_iteration: int
