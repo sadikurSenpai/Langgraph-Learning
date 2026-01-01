@@ -7,6 +7,8 @@ from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage
 from app.services.messages.send_message import send_message
 
+import uuid
+
 router = APIRouter()
 
 checkpointer = InMemorySaver()
@@ -24,6 +26,8 @@ chatbot.add_edge('send_message', END)
 @router.post("/chat/", tags=['Chatting'])
 def chatt(request: ChatRequest):
     thread_id = request.thread_id
+    if not thread_id:
+        thread_id = str(uuid.uuid4())
     config = {
         "configurable": {
             'thread_id': thread_id
