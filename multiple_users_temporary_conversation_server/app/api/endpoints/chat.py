@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from app.api.schemas.chat import ChatRequest
 from app.services.states.ChatState import Chat
 from langgraph.checkpoint.memory import InMemorySaver
@@ -24,7 +24,7 @@ chatbot.add_edge('send_message', END)
 
 
 @router.post("/chat/", tags=['Chatting'])
-def chatt(request: ChatRequest):
+async def chatt(request: ChatRequest):
     thread_id = request.thread_id
     if not thread_id:
         thread_id = str(uuid.uuid4())
@@ -37,15 +37,20 @@ def chatt(request: ChatRequest):
     workflow = chatbot.compile(checkpointer=checkpointer)
     
     user_message = HumanMessage(content=request.message)
-    result = workflow.invoke({
-        'messages': [user_message],
-    }, config=config)
+    
+    async def token_generator():
+        async for event in workflow.astream_events({
+            'messages': [user_message],
+        }, config=config, version="v2"):
+            kind = event["event"]
+            if kind == "on_chat_model_stream":
+                content = event["data"]["chunk"].content
+                if content:
+                    yield content
 
-    return JSONResponse(
-        status_code=200,
-        content={
-            'message': result['messages'][-1].content,
-            'thread_id': thread_id
-        }
+    return StreamingResponse(
+        token_generator(),
+        media_type="text/plain",
+        headers={"X-Thread-ID": thread_id}
     )
 

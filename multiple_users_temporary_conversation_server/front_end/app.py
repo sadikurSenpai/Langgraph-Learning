@@ -50,22 +50,30 @@ def send_message():
     }
 
     try:
-        with st.spinner("Thinking..."):
-            response = requests.post(CHAT_URL, json=payload)
+        with st.chat_message("assistant"):
+            # Use stream=True for streaming response
+            response = requests.post(CHAT_URL, json=payload, stream=True)
             
             if response.status_code == 200:
-                data = response.json()
-                ai_response = data.get("message", "No response content.")
-                new_thread_id = data.get("thread_id")
-
-                # Update thread_id if it's new (or established)
+                # 1. Update Thread ID from Headers
+                new_thread_id = response.headers.get("X-Thread-ID")
                 if new_thread_id:
                     st.session_state.thread_id = new_thread_id
                 
-                # Add AI message to local history
-                st.session_state.messages.append({"role": "assistant", "content": ai_response})
+                # 2. Stream the response
+                def response_generator():
+                    for chunk in response.iter_content(chunk_size=1024):
+                        if chunk:
+                            yield chunk.decode("utf-8")
+                
+                # st.write_stream yields the full content at the end
+                full_response = st.write_stream(response_generator())
+                
+                # 3. Save to history
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+            
             else:
-                st.error(f"Error: {response.status_code} - {response.text}")
+                st.error(f"Server Error: {response.status_code}")
                 
     except requests.exceptions.ConnectionError:
         st.error("Could not connect to the backend server. Is it running?")
@@ -119,33 +127,9 @@ elif st.session_state.page == "chat":
         # Actually, let's just run the logic block here directly instead of a callback function 
         # because st.chat_input returns the value immediately upon submission.
         
-        # Add user message
-        st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
-
-        # Get Response
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                payload = {
-                    "message": prompt,
-                    "thread_id": st.session_state.thread_id
-                }
-                
-                try:
-                    response = requests.post(CHAT_URL, json=payload)
-                    if response.status_code == 200:
-                        data = response.json()
-                        ai_content = data.get("message")
-                        new_thread_id = data.get("thread_id")
-
-                        # Update State
-                        st.session_state.thread_id = new_thread_id
-                        st.session_state.messages.append({"role": "assistant", "content": ai_content})
-                        
-                        st.markdown(ai_content)
-                    else:
-                        st.error(f"Server Error: {response.status_code}")
-                except Exception as e:
-                    st.error(f"Connection Error: {e}")
+            
+        # Logic is handled by send_message function which grabs input from state and handles streaming
+        send_message()
                     
