@@ -9,12 +9,7 @@ def create_outline(state: BlogState):
     topic = state["topic"]
     prompt = f"Create an outline for a blog about {topic}"
 
-    outline_text = ""
+    outline_text = llm.invoke(prompt).content
 
-    for chunk in llm.stream(prompt):
-        if chunk.content:
-            outline_text += chunk.content
-            yield {"messages": [chunk]}
-
-    yield {"outline": outline_text}
+    return {"outline": outline_text}
 

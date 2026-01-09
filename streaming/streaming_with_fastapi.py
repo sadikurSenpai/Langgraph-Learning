@@ -23,13 +23,15 @@ def chat(topic: str):
 
     def token_generator():
         for chunk, meta in workflow.stream(
-            {"topic": topic},
-            stream_mode="messages",
+            {
+                'topic': topic
+            }, 
+            stream_mode="messages"
         ):
             if chunk.content:
                 yield chunk.content
 
     return StreamingResponse(
         token_generator(),
-        media_type="text/plain",
+        media_type="text/plain"
     )
